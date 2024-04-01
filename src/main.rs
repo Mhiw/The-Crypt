@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+
+
 fn main() {
     App::new()
         .add_plugins(
@@ -15,5 +17,12 @@ fn main() {
                 })
                 .build()
         )
+        .add_systems(Startup, setup_camera)
         .run()
+}
+
+fn setup_camera(
+    mut commands: Commands,
+) {
+    commands.spawn(Camera2dBundle::default());
 }
