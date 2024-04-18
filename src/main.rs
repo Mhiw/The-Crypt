@@ -186,11 +186,6 @@ fn setup_player(
             texture: asset_server.load("textures/texture_atlas.png"),
             ..default()
         },
-        Transform {
-            translation: Vec3::new(0.0, 0.0, 0.0),
-            rotation: Quat::IDENTITY,
-            scale: Vec3::splat(50.0),
-        },
         Player::new(50.0, 100.0, 100.0),
     ));
 }
