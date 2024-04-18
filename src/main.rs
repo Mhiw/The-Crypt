@@ -103,6 +103,23 @@ lazy_static! {
     };
 }
 
+lazy_static! {
+    static ref KEYS: HashMap<&'static str, KeyCode> = {
+        let mut map = HashMap::new();
+        /*
+        map.insert("Up".to_string(), KeyCode::ArrowUp);
+        map.insert("Down".to_string(), KeyCode::ArrowDown);
+        map.insert("Left".to_string(), KeyCode::ArrowLeft);
+        map.insert("Right".to_string(), KeyCode::ArrowRight);
+        */
+        map.insert("Up", KeyCode::ArrowUp);
+        map.insert("Down", KeyCode::ArrowDown);
+        map.insert("Left", KeyCode::ArrowLeft);
+        map.insert("Right", KeyCode::ArrowRight);
+        map
+    };
+}
+
 pub trait Entity {
     fn take_damage(&mut self, damage: f32);
     fn get_skillset(&self) -> SkillSet;
@@ -161,6 +178,7 @@ fn main() {
         )
         .add_systems(Startup, setup_camera)
         .add_systems(Startup, setup_player)
+        .add_systems(Update, move_player)
         .run()
 }
 
@@ -183,6 +201,11 @@ fn setup_player(
                 }),
                 ..default()
             },
+            transform: Transform {
+                translation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
+                scale: Vec3::splat(5.0),
+            },
             texture: asset_server.load("textures/texture_atlas.png"),
             ..default()
         },
@@ -191,21 +214,26 @@ fn setup_player(
 }
 
 fn move_player(
-    mut commands: Commands,
-    mut players: Query<&mut Player>,
-    mut keyboard_event_reader: EventReader<KeyboardInput>,
+    mut players: Query<(&mut Transform, &Player)>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
-    use bevy::input::ButtonState;
+    let mut delta_velocity: Vec3 = Vec3::ZERO;
 
-    for event in keyboard_event_reader.read() {
-        let pressed_key: Option<KeyCode> = match event.state {
-            ButtonState::Pressed => Some(event.key_code),
-            _ => None,
-        };
+    if keyboard_input.pressed(*KEYS.get("Up").unwrap()) {
+        delta_velocity.y = 1.0;
+    }
+    if keyboard_input.pressed(*KEYS.get("Down").unwrap()) {
+        delta_velocity.y = -1.0;
+    }
+    if keyboard_input.pressed(*KEYS.get("Left").unwrap()) {
+        delta_velocity.x = -1.0;
+    }
+    if keyboard_input.pressed(*KEYS.get("Right").unwrap()) {
+        delta_velocity.x = 1.0;
+    }
 
-        if pressed_key.is_some() {
-            
-        }
+    for (mut player_transform, player) in players.iter_mut() {
+        player_transform.translation += delta_velocity * player.get_skillset().get_speed() * time.delta_seconds();
     }
 }
