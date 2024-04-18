@@ -1,11 +1,8 @@
-use bevy::{
-    prelude::*,
-    input::keyboard::KeyboardInput,
-};
+use bevy::prelude::*;
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 
-#[derive(Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub enum EnemyVariant {
     Zombie,
     Skeleton,
@@ -13,6 +10,9 @@ pub enum EnemyVariant {
     Bird,
     Pirate,
 }
+
+#[derive(Resource)]
+pub struct EnemySpawnTimer(Timer);
 
 pub struct SkillSet {
     xp: f32,
@@ -106,12 +106,6 @@ lazy_static! {
 lazy_static! {
     static ref KEYS: HashMap<&'static str, KeyCode> = {
         let mut map = HashMap::new();
-        /*
-        map.insert("Up".to_string(), KeyCode::ArrowUp);
-        map.insert("Down".to_string(), KeyCode::ArrowDown);
-        map.insert("Left".to_string(), KeyCode::ArrowLeft);
-        map.insert("Right".to_string(), KeyCode::ArrowRight);
-        */
         map.insert("Up", KeyCode::ArrowUp);
         map.insert("Down", KeyCode::ArrowDown);
         map.insert("Left", KeyCode::ArrowLeft);
@@ -141,8 +135,6 @@ impl Player {
             },
         }
     }
-
-    
 }
 
 impl Entity for Player {
@@ -155,9 +147,29 @@ impl Entity for Player {
     }
 }
 
+#[derive(Component)]
 pub struct Enemy {
     variant: EnemyVariant,
-    skills: SkillSet,
+    skillset: SkillSet,
+}
+
+impl Enemy {
+    pub fn new(variant: EnemyVariant) -> Self {
+        Enemy {
+            variant: variant.clone(),
+            skillset: ENEMIES.get(&variant.clone()).unwrap().clone(),
+        }
+    }
+}
+
+impl Entity for Enemy {
+    fn take_damage(&mut self, damage: f32) {
+        self.get_skillset().set_damage(self.get_skillset().get_health() - damage);
+    }
+    
+    fn get_skillset(&self) -> SkillSet {
+        self.skillset.clone()
+    }
 }
 
 fn main() {
@@ -176,9 +188,11 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .build()
         )
+        .insert_resource(EnemySpawnTimer(Timer::from_seconds(5.0, TimerMode::Repeating)))
         .add_systems(Startup, setup_camera)
         .add_systems(Startup, setup_player)
         .add_systems(Update, move_player)
+        .add_systems(Update, spawn_enemy)
         .run()
 }
 
@@ -236,4 +250,35 @@ fn move_player(
     for (mut player_transform, player) in players.iter_mut() {
         player_transform.translation += delta_velocity * player.get_skillset().get_speed() * time.delta_seconds();
     }
+}
+
+fn spawn_enemy(
+    mut commands: Commands,
+    mut spawn_timer: ResMut<EnemySpawnTimer>,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+) {
+    if !spawn_timer.0.tick(time.delta()).just_finished() {
+        return
+    }
+
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                rect: Some(Rect {
+                    min: Vec2::new(24.0, 32.0),
+                    max: Vec2::new(32.0, 40.0),
+                }),
+                ..default()
+            },
+            texture: asset_server.load("textures/texture_atlas.png"),
+            transform: Transform {
+                translation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
+                scale: Vec3::splat(5.0),
+            },
+            ..default()
+        },
+        Enemy::new(EnemyVariant::Zombie),
+    ));
 }
