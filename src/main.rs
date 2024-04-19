@@ -1,4 +1,7 @@
-use bevy::prelude::*;
+use bevy::{
+    prelude::*,
+    window::PrimaryWindow,
+};
 use std::collections::HashMap;
 use lazy_static::lazy_static;
 
@@ -120,6 +123,14 @@ pub trait Entity {
 }
 
 #[derive(Component)]
+pub struct Bow {
+    
+}
+
+#[derive(Component)]
+pub struct MainCamera;
+
+#[derive(Component)]
 pub struct Player {
     skillset: SkillSet,
 }
@@ -176,6 +187,7 @@ impl Entity for Enemy {
     }
 }
 
+#[derive(Debug)]
 pub struct Collision {
     point: Vec2,
 }
@@ -185,6 +197,10 @@ impl Collision {
         Collision {
             point,
         }
+    }
+
+    pub fn get_point(&self) -> Vec2 {
+        self.point.clone()
     }
 }
 
@@ -219,7 +235,7 @@ impl Collider {
             self.get_position().x + self.get_dimensions().x > other.get_position().x &&
             self.get_position().y < other.get_position().y + other.get_dimensions().y &&
             self.get_position().y + self.get_dimensions().y > other.get_position().y {
-            (true, Some(Collision::new(Vec2::ZERO)))
+            (true, Some(Collision::new(self.get_position() - other.get_position())))
         } else {
             (false, None)
         }
@@ -245,16 +261,21 @@ fn main() {
         .insert_resource(EnemySpawnTimer(Timer::from_seconds(5.0, TimerMode::Repeating)))
         .add_systems(Startup, setup_camera)
         .add_systems(Startup, setup_player)
+        .add_systems(Startup, setup_bow)
         .add_systems(Update, move_player)
         .add_systems(Update, spawn_enemy)
         .add_systems(Update, check_player_collisions)
+        .add_systems(Update, rotate_bow)
         .run()
 }
 
 fn setup_camera(
     mut commands: Commands,
 ) {
-    commands.spawn(Camera2dBundle::default());
+    commands.spawn((
+        Camera2dBundle::default(),
+        MainCamera,
+    ));
 }
 
 fn setup_player(
@@ -280,6 +301,31 @@ fn setup_player(
         },
         Player::new(50.0, 100.0, 100.0),
         Collider::new(Vec2::ZERO, Vec2::new(20.0, 20.0)),
+    ));
+}
+
+fn setup_bow(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+) {
+    commands.spawn((
+        SpriteBundle {
+            sprite: Sprite {
+                rect: Some(Rect {
+                    min: Vec2::new(16.0, 0.0),
+                    max: Vec2::new(24.0, 8.0),
+                }),
+                ..default()
+            },
+            transform: Transform {
+                translation: Vec3::ZERO,
+                rotation: Quat::IDENTITY,
+                scale: Vec3::splat(5.0),
+            },
+            texture: asset_server.load("textures/texture_atlas.png"),
+            ..default()
+        },
+        Bow {  },
     ));
 }
 
@@ -347,13 +393,34 @@ fn spawn_enemy(
 fn check_player_collisions(
     player_colliders: Query<(&mut Collider, &Player)>,
     other_colliders: Query<&mut Collider, Without<Player>>,
-    time: Res<Time>,
 ) {
     for other_collider in other_colliders.iter() {
         for (player_collider, _) in player_colliders.iter() {
-            if player_collider.collide(other_collider).0 {
-                println!("Collision | {}", time.delta_seconds());
-            }
+            //println!("Collision: {:#?}", player_collider.collide(other_collider))
+        }
+    }
+}
+
+fn rotate_bow(
+    mut bows: Query<&mut Transform, With<Bow>>,
+    player_query: Query<&Transform, (With<Player>, Without<Bow>)>,
+    window: Query<&Window, With<PrimaryWindow>>,
+    main_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
+) {
+    let (camera, camera_transform) = main_camera.single();
+    let player_transform = player_query.single();
+    let window = window.single();
+   
+    for mut bow_transform in bows.iter_mut() {
+        if let Some(world_position) = window.cursor_position()
+            .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+            .map(|ray| ray.origin.truncate()) {
+
+            let a = world_position.x - bow_transform.translation.x;
+            let b = world_position.y - bow_transform.translation.y;
+            let angle = a.atan2(b);
+            bow_transform.rotation = Quat::from_rotation_z(-angle);
+            println!("{}", angle.to_degrees());
         }
     }
 }
