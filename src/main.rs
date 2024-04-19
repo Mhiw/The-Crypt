@@ -160,6 +160,10 @@ impl Enemy {
             skillset: ENEMIES.get(&variant.clone()).unwrap().clone(),
         }
     }
+
+    pub fn get_variant(&self) -> EnemyVariant {
+        self.variant.clone()
+    }
 }
 
 impl Entity for Enemy {
@@ -169,6 +173,54 @@ impl Entity for Enemy {
     
     fn get_skillset(&self) -> SkillSet {
         self.skillset.clone()
+    }
+}
+
+pub struct Collision {
+    point: Vec2,
+}
+
+impl Collision {
+    pub fn new(point: Vec2) -> Self {
+        Collision {
+            point,
+        }
+    }
+}
+
+#[derive(Component)]
+pub struct Collider {
+    position: Vec2,
+    dimensions: Vec2,
+}
+
+impl Collider {
+    pub fn new(position: Vec2, dimensions: Vec2) -> Self {
+        Collider {
+            position,
+            dimensions,
+        }
+    }
+
+    pub fn get_dimensions(&self) -> Vec2 {
+        self.dimensions.clone()
+    }
+
+    pub fn get_position(&self) -> Vec2 {
+        self.position.clone()
+    }
+
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position.clone()
+    }
+
+    pub fn collide(&self, other: &Collider) -> (bool, Option<Collision>) {
+        if self.get_position().x < other.get_position().x + other.get_dimensions().x &&
+            self.get_position().x + self.get_dimensions().x > other.get_position().x {
+            (true, Some(Collision::new(Vec2::ZERO)))
+        } else {
+            (false, None)
+        }
     }
 }
 
@@ -193,6 +245,7 @@ fn main() {
         .add_systems(Startup, setup_player)
         .add_systems(Update, move_player)
         .add_systems(Update, spawn_enemy)
+        .add_systems(Update, check_player_collisions)
         .run()
 }
 
@@ -224,11 +277,13 @@ fn setup_player(
             ..default()
         },
         Player::new(50.0, 100.0, 100.0),
+        Collider::new(Vec2::ZERO, Vec2::new(20.0, 20.0)),
     ));
 }
 
 fn move_player(
     mut players: Query<(&mut Transform, &Player)>,
+    mut player_colliders: Query<(&mut Collider, &Player)>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
 ) {
@@ -249,6 +304,9 @@ fn move_player(
 
     for (mut player_transform, player) in players.iter_mut() {
         player_transform.translation += delta_velocity * player.get_skillset().get_speed() * time.delta_seconds();
+        for (mut player_collider, _) in player_colliders.iter_mut() {
+            player_collider.set_position(Vec2::new(player_transform.translation.x, player_transform.translation.y));
+        }
     }
 }
 
@@ -280,5 +338,20 @@ fn spawn_enemy(
             ..default()
         },
         Enemy::new(EnemyVariant::Zombie),
+        Collider::new(Vec2::ZERO, Vec2::new(20.0, 20.0)),
     ));
+}
+
+fn check_player_collisions(
+    player_colliders: Query<(&mut Collider, &Player)>,
+    other_colliders: Query<&mut Collider, Without<Player>>,
+    time: Res<Time>,
+) {
+    for other_collider in other_colliders.iter() {
+        for (player_collider, _) in player_colliders.iter() {
+            if player_collider.collide(other_collider).0 {
+                println!("Collision | {}", time.delta_seconds());
+            }
+        }
+    }
 }
