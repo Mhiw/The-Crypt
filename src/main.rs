@@ -216,7 +216,9 @@ impl Collider {
 
     pub fn collide(&self, other: &Collider) -> (bool, Option<Collision>) {
         if self.get_position().x < other.get_position().x + other.get_dimensions().x &&
-            self.get_position().x + self.get_dimensions().x > other.get_position().x {
+            self.get_position().x + self.get_dimensions().x > other.get_position().x &&
+            self.get_position().y < other.get_position().y + other.get_dimensions().y &&
+            self.get_position().y + self.get_dimensions().y > other.get_position().y {
             (true, Some(Collision::new(Vec2::ZERO)))
         } else {
             (false, None)
