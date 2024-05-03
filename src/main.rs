@@ -266,6 +266,7 @@ fn main() {
         .add_systems(Update, spawn_enemy)
         .add_systems(Update, check_player_collisions)
         .add_systems(Update, rotate_bow)
+        .add_systems(Update, shoot_bow)
         .run()
 }
 
@@ -396,19 +397,17 @@ fn check_player_collisions(
 ) {
     for other_collider in other_colliders.iter() {
         for (player_collider, _) in player_colliders.iter() {
-            //println!("Collision: {:#?}", player_collider.collide(other_collider))
+            println!("Collision: {:#?}", player_collider.collide(other_collider));
         }
     }
 }
 
 fn rotate_bow(
     mut bows: Query<&mut Transform, With<Bow>>,
-    player_query: Query<&Transform, (With<Player>, Without<Bow>)>,
     window: Query<&Window, With<PrimaryWindow>>,
     main_camera: Query<(&Camera, &GlobalTransform), With<MainCamera>>,
 ) {
     let (camera, camera_transform) = main_camera.single();
-    let player_transform = player_query.single();
     let window = window.single();
    
     for mut bow_transform in bows.iter_mut() {
@@ -420,7 +419,38 @@ fn rotate_bow(
             let b = world_position.y - bow_transform.translation.y;
             let angle = a.atan2(b);
             bow_transform.rotation = Quat::from_rotation_z(-angle);
-            println!("{}", angle.to_degrees());
         }
+    }
+}
+
+fn shoot_bow(
+    mut commands: Commands,
+    bows: Query<&Transform, With<Bow>>,
+    buttons: Res<ButtonInput<MouseButton>>,
+    asset_server: Res<AssetServer>,
+) {
+    if !buttons.pressed(MouseButton::Left) {
+        return
+    }
+    
+    for bow_transform in bows.iter() {
+        commands.spawn((
+            SpriteBundle {
+                sprite: Sprite {
+                    rect: Some(Rect {
+                        min: Vec2::new(0.0, 0.0),
+                        max: Vec2::new(8.0, 8.0),
+                    }),
+                    ..default()
+                },
+                transform: Transform {
+                    translation: bow_transform.translation,
+                    rotation: bow_transform.rotation,
+                    scale: Vec3::splat(5.0),
+                },
+                texture: asset_server.load("textures/texture_atlas.png"),
+                ..default()
+            },
+        ));
     }
 }
